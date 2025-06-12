@@ -38,6 +38,8 @@
     opacity: number;
     pulsePhase: number;
     originalSize: number;
+    initialSpeed: number;
+    maxSpeed: number;
   }
 
   // 配置接口定义
@@ -113,18 +115,25 @@
     private createParticles(): void {
       this.particles = [];
       for (let i = 0; i < this.config.particleCount; i++) {
+        const vx = (Math.random() - 0.5) * this.config.particleSpeed;
+        const vy = (Math.random() - 0.5) * this.config.particleSpeed;
+        const initialSpeed = Math.sqrt(vx * vx + vy * vy);
+        
         const particle: Particle = {
           x: Math.random() * this.canvas.width,
           y: Math.random() * this.canvas.height,
-          vx: (Math.random() - 0.5) * this.config.particleSpeed,
-          vy: (Math.random() - 0.5) * this.config.particleSpeed,
+          vx: vx,
+          vy: vy,
           size: Math.random() * (this.config.particleSize.max - this.config.particleSize.min) + this.config.particleSize.min,
           color: this.config.colors.particles[Math.floor(Math.random() * this.config.colors.particles.length)],
           opacity: Math.random() * 0.5 + 0.3,
           pulsePhase: Math.random() * Math.PI * 2,
-          originalSize: 0
+          originalSize: 0,
+          initialSpeed: Math.max(initialSpeed, 0.05),
+          maxSpeed: 0
         };
         particle.originalSize = particle.size;
+        particle.maxSpeed = particle.initialSpeed * 3;
         this.particles.push(particle);
       }
     }
@@ -149,8 +158,24 @@
           
           if (distance < this.config.mouseInfluence) {
             const force = (this.config.mouseInfluence - distance) / this.config.mouseInfluence;
-            particle.vx += dx * force * 0.002;
-            particle.vy += dy * force * 0.002;
+            
+            // 计算加速度
+            const accelerationX = dx * force * 0.002;
+            const accelerationY = dy * force * 0.002;
+            
+            // 应用加速度
+            particle.vx += accelerationX;
+            particle.vy += accelerationY;
+            
+            // 计算当前速度大小
+            const currentSpeed = Math.sqrt(particle.vx * particle.vx + particle.vy * particle.vy);
+            
+            // 如果超过最大速度，进行限制
+            if (currentSpeed > particle.maxSpeed) {
+              const ratio = particle.maxSpeed / currentSpeed;
+              particle.vx *= ratio;
+              particle.vy *= ratio;
+            }
             
             // 鼠标附近的粒子会变大发光
             particle.size = particle.originalSize * (1 + force * 0.5);
@@ -159,6 +184,14 @@
             // 恢复原始状态
             particle.size = particle.originalSize;
             particle.opacity = Math.max(0.3, particle.opacity - 0.01);
+          }
+        } else {
+          // 当没有鼠标交互时，粒子速度逐渐回归到合理范围
+          const currentSpeed = Math.sqrt(particle.vx * particle.vx + particle.vy * particle.vy);
+          if (currentSpeed > particle.initialSpeed * 1.5) {
+            const dampingFactor = 0.995; // 轻微的阻尼效果
+            particle.vx *= dampingFactor;
+            particle.vy *= dampingFactor;
           }
         }
 
