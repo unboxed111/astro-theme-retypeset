@@ -63,15 +63,30 @@
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
     private particles: Particle[] = [];
-    private connections: any[] = [];
     private mouseX: number = 0;
     private mouseY: number = 0;
     private isMouseActive: boolean = false;
     private config: StardustConfig;
+    private animationId: number = 0; // 添加动画ID用于清理
 
     constructor() {
-      this.canvas = document.getElementById('stardust-canvas') as HTMLCanvasElement;
-      this.ctx = this.canvas.getContext('2d')!;
+      const canvas = document.getElementById('stardust-canvas') as HTMLCanvasElement;
+      if (!canvas) {
+        // 如果找不到canvas，创建一个虚拟的配置以满足TypeScript
+        this.canvas = canvas;
+        this.ctx = {} as CanvasRenderingContext2D;
+        this.config = {} as StardustConfig;
+        return;
+      }
+      
+      this.canvas = canvas;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        this.ctx = {} as CanvasRenderingContext2D;
+        this.config = {} as StardustConfig;
+        return;
+      }
+      this.ctx = ctx;
       
       // 配置参数
       this.config = {
@@ -275,44 +290,90 @@
       this.drawParticles();
       this.drawMouseConnections();
       
-      requestAnimationFrame(() => this.animate());
+      this.animationId = requestAnimationFrame(() => this.animate());
     }
+
+    // 添加销毁方法
+    public destroy(): void {
+      if (this.animationId) {
+        cancelAnimationFrame(this.animationId);
+      }
+      // 移除事件监听器
+      window.removeEventListener('resize', this.resize);
+      window.removeEventListener('mousemove', this.handleMouseMove);
+      window.removeEventListener('mouseleave', this.handleMouseLeave);
+      window.removeEventListener('touchmove', this.handleTouchMove);
+      window.removeEventListener('touchend', this.handleTouchEnd);
+    }
+
+    // 将事件处理函数提取为方法，便于移除
+    private handleMouseMove = (e: MouseEvent) => {
+      this.mouseX = e.clientX;
+      this.mouseY = e.clientY;
+      this.isMouseActive = true;
+    };
+
+    private handleMouseLeave = () => {
+      this.isMouseActive = false;
+    };
+
+    private handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        this.mouseX = e.touches[0].clientX;
+        this.mouseY = e.touches[0].clientY;
+        this.isMouseActive = true;
+      }
+    };
+
+    private handleTouchEnd = () => {
+      this.isMouseActive = false;
+    };
 
     private bindEvents(): void {
       window.addEventListener('resize', () => this.resize());
-      
-      window.addEventListener('mousemove', (e: MouseEvent) => {
-        this.mouseX = e.clientX;
-        this.mouseY = e.clientY;
-        this.isMouseActive = true;
-      });
-
-      window.addEventListener('mouseleave', () => {
-        this.isMouseActive = false;
-      });
-
-      // 触摸设备支持
-      window.addEventListener('touchmove', (e: TouchEvent) => {
-        if (e.touches.length > 0) {
-          this.mouseX = e.touches[0].clientX;
-          this.mouseY = e.touches[0].clientY;
-          this.isMouseActive = true;
-        }
-      });
-
-      window.addEventListener('touchend', () => {
-        this.isMouseActive = false;
-      });
+      window.addEventListener('mousemove', this.handleMouseMove);
+      window.addEventListener('mouseleave', this.handleMouseLeave);
+      window.addEventListener('touchmove', this.handleTouchMove);
+      window.addEventListener('touchend', this.handleTouchEnd);
     }
   }
 
-  // 等待 DOM 加载完成后初始化
-  document.addEventListener('DOMContentLoaded', () => {
+  // 全局变量存储星尘实例
+  let stardustInstance: StardustNetwork | null = null;
+
+  // 初始化星尘网络的函数
+  function initStardust() {
     // 检查用户是否偏好减少动画
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     
     if (!prefersReducedMotion) {
-      new StardustNetwork();
+      // 如果已有实例，先销毁
+      if (stardustInstance) {
+        stardustInstance.destroy();
+      }
+      // 创建新实例
+      stardustInstance = new StardustNetwork();
+    }
+  }
+
+  // 页面加载完成时初始化
+  document.addEventListener('DOMContentLoaded', initStardust);
+
+  // Astro View Transitions 支持
+  document.addEventListener('astro:page-load', initStardust);
+
+  // 页面卸载时清理
+  document.addEventListener('astro:before-preparation', () => {
+    if (stardustInstance) {
+      stardustInstance.destroy();
+      stardustInstance = null;
+    }
+  });
+
+  // 备用：在页面可见性改变时重新初始化（处理一些边缘情况）
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !stardustInstance) {
+      setTimeout(initStardust, 100); // 稍微延迟以确保DOM准备就绪
     }
   });
 </script> 
