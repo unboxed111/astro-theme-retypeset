@@ -4,6 +4,7 @@ import Footer from '@/components/Footer.astro'
 import Header from '@/components/Header.astro'
 import Navbar from '@/components/Navbar.astro'
 import StardustNetwork from '@/components/StardustNetwork.astro'
+import ReadingProgress from '@/components/ReadingProgress.astro'
 import CodeCopyButton from '@/components/Widgets/CodeCopyButton.astro'
 import GithubCard from '@/components/Widgets/GithubCard.astro'
 import GsapAnimation from '@/components/Widgets/GsapAnimation.astro'
@@ -44,6 +45,7 @@ const MarginBottom = isPost && themeConfig.comment?.enabled
   <Head {postTitle} {postDescription} {postSlug} />
   <body>
     {animationEnabled && <StardustNetwork />}
+    {isPost && animationEnabled && <ReadingProgress />}
     <div
       class="mx-auto max-w-205.848 min-h-vh w-full min-h-dvh"
       p="x-[min(7.25vw,3.731rem)] y-10"
@@ -61,5 +63,49 @@ const MarginBottom = isPost && themeConfig.comment?.enabled
     <CodeCopyButton />
     <PhotoSwipe />
     <GithubCard />
+    {animationEnabled && (
+      <script is:inline>
+        // 等待 DOM 加载完成后再导入模块
+        function loadNeonCursor() {
+          import('/src/components/NeonCursor.js').then(module => {
+            const { initNeonCursor } = module;
+            
+            // 全局变量存储光标实例
+            window.neonCursorInstance = null;
+            
+            // 初始化光标
+            function initCursor() {
+              // 如果已有实例，先销毁
+              if (window.neonCursorInstance) {
+                window.neonCursorInstance.destroy();
+              }
+              // 创建新实例
+              window.neonCursorInstance = initNeonCursor();
+            }
+            
+            // 立即初始化
+            initCursor();
+            
+            // Astro View Transitions 支持
+            document.addEventListener('astro:page-load', initCursor);
+            
+            // 页面卸载时清理
+            document.addEventListener('astro:before-preparation', () => {
+              if (window.neonCursorInstance) {
+                window.neonCursorInstance.destroy();
+                window.neonCursorInstance = null;
+              }
+            });
+          });
+        }
+        
+        // 页面加载完成时初始化
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', loadNeonCursor);
+        } else {
+          loadNeonCursor();
+        }
+      </script>
+    )}
   </body>
 </html>

@@ -1,0 +1,214 @@
+---
+// 阅读进度条组件
+// 仅在文章页面显示，追踪阅读进度
+import themeConfig from '@/config'
+
+// 获取配置的高亮颜色
+const highlightColor = themeConfig.color.mode === 'dark' 
+  ? themeConfig.color.dark.highlight 
+  : themeConfig.color.light.highlight;
+---
+
+<div id="reading-progress-container" class="reading-progress-container">
+  <div id="reading-progress-bar" class="reading-progress-bar"></div>
+</div>
+
+<style define:vars={{ highlightColor }}>
+  .reading-progress-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background-color: transparent;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+
+  .reading-progress-container.visible {
+    opacity: 1;
+  }
+
+  .reading-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(
+      90deg,
+      var(--highlightColor) 0%,
+      oklch(from var(--highlightColor) l c h / 0.6) 100%
+    );
+    box-shadow: 0 0 10px oklch(from var(--highlightColor) l c h / 0.4);
+    transition: width 0.1s ease-out;
+    will-change: width;
+    transform-origin: left center;
+  }
+
+  /* 为不支持 oklch from 语法的浏览器提供回退方案 */
+  @supports not (color: oklch(from red l c h)) {
+    .reading-progress-bar {
+      background: var(--highlightColor);
+      box-shadow: 0 0 10px var(--highlightColor);
+    }
+  }
+
+  /* 脉动动画 - 当到达底部时 */
+  @keyframes pulse-complete {
+    0% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scaleY(1.5);
+      opacity: 0.8;
+    }
+    100% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+  }
+
+  .reading-progress-bar.complete {
+    animation: pulse-complete 0.6s ease-in-out;
+  }
+
+  /* 哲学思辨风格的微妙动画 */
+  @keyframes subtle-glow {
+    0%, 100% {
+      filter: brightness(1);
+    }
+    50% {
+      filter: brightness(1.1);
+    }
+  }
+
+  .reading-progress-bar {
+    animation: subtle-glow 3s ease-in-out infinite;
+  }
+</style>
+
+<script>
+  class ReadingProgress {
+    private container: HTMLElement;
+    private progressBar: HTMLElement;
+    private ticking: boolean = false;
+    private isComplete: boolean = false;
+    private lastProgress: number = 0;
+
+    constructor() {
+      this.container = document.getElementById('reading-progress-container')!;
+      this.progressBar = document.getElementById('reading-progress-bar')!;
+      
+      if (!this.container || !this.progressBar) return;
+
+      this.init();
+    }
+
+    private init(): void {
+      // 延迟显示进度条，避免页面加载时的闪烁
+      setTimeout(() => {
+        this.container.classList.add('visible');
+      }, 300);
+
+      // 绑定滚动事件
+      this.bindScrollEvent();
+      
+      // 初始计算
+      this.updateProgress();
+    }
+
+    private bindScrollEvent(): void {
+      // 使用节流的滚动监听
+      window.addEventListener('scroll', () => {
+        if (!this.ticking) {
+          window.requestAnimationFrame(() => {
+            this.updateProgress();
+            this.ticking = false;
+          });
+          this.ticking = true;
+        }
+      }, { passive: true });
+
+      // 窗口大小改变时重新计算
+      window.addEventListener('resize', () => {
+        this.updateProgress();
+      });
+    }
+
+    private updateProgress(): void {
+      // 获取文档高度和视口高度
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      
+      // 计算可滚动的高度
+      const scrollableHeight = documentHeight - windowHeight;
+      
+      // 计算进度百分比
+      let progress = 0;
+      if (scrollableHeight > 0) {
+        progress = Math.min((scrollTop / scrollableHeight) * 100, 100);
+      }
+
+      // 平滑过渡，避免抖动
+      progress = Math.round(progress * 100) / 100;
+
+      // 更新进度条宽度
+      this.progressBar.style.width = `${progress}%`;
+
+      // 完成动画
+      if (progress >= 99.5 && !this.isComplete) {
+        this.isComplete = true;
+        this.progressBar.classList.add('complete');
+        
+        // 移除完成动画类
+        setTimeout(() => {
+          this.progressBar.classList.remove('complete');
+        }, 600);
+      } else if (progress < 99.5) {
+        this.isComplete = false;
+      }
+
+      // 记录上次进度
+      this.lastProgress = progress;
+    }
+
+    // 销毁方法
+    public destroy(): void {
+      window.removeEventListener('scroll', this.updateProgress);
+      window.removeEventListener('resize', this.updateProgress);
+    }
+  }
+
+  // 初始化阅读进度条
+  let readingProgressInstance: ReadingProgress | null = null;
+
+  function initReadingProgress() {
+    // 检查是否在文章页面
+    const isPostPage = document.querySelector('article') !== null;
+    
+    if (isPostPage) {
+      // 销毁旧实例
+      if (readingProgressInstance) {
+        readingProgressInstance.destroy();
+      }
+      // 创建新实例
+      readingProgressInstance = new ReadingProgress();
+    }
+  }
+
+  // 页面加载完成时初始化
+  document.addEventListener('DOMContentLoaded', initReadingProgress);
+
+  // Astro View Transitions 支持
+  document.addEventListener('astro:page-load', initReadingProgress);
+
+  // 页面卸载时清理
+  document.addEventListener('astro:before-preparation', () => {
+    if (readingProgressInstance) {
+      readingProgressInstance.destroy();
+      readingProgressInstance = null;
+    }
+  });
+</script> 

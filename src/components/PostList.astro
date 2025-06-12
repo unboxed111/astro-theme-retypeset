@@ -2,7 +2,7 @@
 import type { CollectionEntry } from 'astro:content'
 import PinIcon from '@/assets/icons/pin-icon.svg'
 import PostDate from '@/components/PostDate.astro'
-import { defaultLocale } from '@/config'
+import { defaultLocale, themeConfig } from '@/config'
 import { generateDescription } from '@/utils/description'
 import { isHomePage } from '@/utils/page'
 
@@ -33,67 +33,202 @@ function getPostPath(post: Post) {
   // Add language prefix for non-default languages
   return `/${lang}/posts/${postPath}/`
 }
+
+// 获取主题颜色
+const isDarkMode = themeConfig.color.mode === 'dark'
+const primaryColor = isDarkMode ? themeConfig.color.dark.primary : themeConfig.color.light.primary
+const secondaryColor = isDarkMode ? themeConfig.color.dark.secondary : themeConfig.color.light.secondary
+const highlightColor = isDarkMode ? themeConfig.color.dark.highlight : themeConfig.color.light.highlight
 ---
 
 <ul>
   {posts.map(post => (
     <li
-      class="mb-5.5"
+      class="post-card-wrapper mb-5.5 relative"
       lg={isHome ? 'mb-10' : ''}
     >
+      <div class="post-card-content relative z-10 bg-background p-4 rounded-lg">
+        {/* post title */}
+        <h3 class="inline transition-colors hover:c-primary">
+          <a
+            class="cjk:tracking-0.02em"
+            lg={isHome ? 'font-medium text-4.5' : ''}
+            href={getPostPath(post)}
+            transition:name={`post-${post.data.abbrlink || post.id}${lang ? `-${lang}` : ''}`}
+            data-disable-theme-transition
+          >
+            {post.data.title}
+          </a>
 
-      {/* post title */}
-      <h3 class="inline transition-colors hover:c-primary">
-        <a
-          class="cjk:tracking-0.02em"
-          lg={isHome ? 'font-medium text-4.5' : ''}
-          href={getPostPath(post)}
-          transition:name={`post-${post.data.abbrlink || post.id}${lang ? `-${lang}` : ''}`}
+            {/* pinned icon */}
+            {pinned && (
+              <PinIcon
+                aria-hidden="true"
+                class="ml-0.25em inline-block aspect-square w-0.98em translate-y--0.1em lg:(w-1.05em translate-y--0.15em)"
+                fill="currentColor"
+              />
+            )}
+        </h3>
+
+        {/* mobile post time */}
+        <div
+          class="py-0.8 text-3.5 font-time lg:hidden"
+          transition:name={`time-${post.data.abbrlink || post.id}${lang ? `-${lang}` : ''}`}
           data-disable-theme-transition
         >
-          {post.data.title}
-        </a>
-
-          {/* pinned icon */}
-          {pinned && (
-            <PinIcon
-              aria-hidden="true"
-              class="ml-0.25em inline-block aspect-square w-0.98em translate-y--0.1em lg:(w-1.05em translate-y--0.15em)"
-              fill="currentColor"
-            />
-          )}
-      </h3>
-
-      {/* mobile post time */}
-      <div
-        class="py-0.8 text-3.5 font-time lg:hidden"
-        transition:name={`time-${post.data.abbrlink || post.id}${lang ? `-${lang}` : ''}`}
-        data-disable-theme-transition
-      >
-        <PostDate
-          date={post.data.published}
-          minutes={post.remarkPluginFrontmatter?.minutes}
-        />
-      </div>
-
-      {/* desktop post time */}
-      <div class="hidden text-3.65 font-time lg:(ml-2.5 inline)">
-        <PostDate
-          date={post.data.published}
-          minutes={post.remarkPluginFrontmatter?.minutes}
-        />
-      </div>
-
-      {/* desktop post description */}
-      {isHome && (
-        <div
-          class="heti hidden"
-          lg="mt-2.25 block"
-        >
-          <p>{generateDescription(post, 'list')}</p>
+          <PostDate
+            date={post.data.published}
+            minutes={post.remarkPluginFrontmatter?.minutes}
+          />
         </div>
-      )}
 
+        {/* desktop post time */}
+        <div class="hidden text-3.65 font-time lg:(ml-2.5 inline)">
+          <PostDate
+            date={post.data.published}
+            minutes={post.remarkPluginFrontmatter?.minutes}
+          />
+        </div>
+
+        {/* desktop post description */}
+        {isHome && (
+          <div
+            class="heti hidden"
+            lg="mt-2.25 block"
+          >
+            <p>{generateDescription(post, 'list')}</p>
+          </div>
+        )}
+      </div>
     </li>
   ))}
 </ul>
+
+<style define:vars={{ primaryColor, secondaryColor, highlightColor }}>
+  .post-card-wrapper {
+    position: relative;
+    isolation: isolate;
+  }
+
+  /* 动态边框容器 */
+  .post-card-wrapper::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 0.75rem;
+    padding: 2px;
+    background: conic-gradient(
+      from var(--gradient-angle, 0deg),
+      var(--primaryColor),
+      var(--highlightColor),
+      var(--secondaryColor),
+      var(--highlightColor),
+      var(--primaryColor)
+    );
+    -webkit-mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    animation: rotate-gradient 8s linear infinite;
+    z-index: -1;
+  }
+
+  /* 旋转动画 */
+  @keyframes rotate-gradient {
+    to {
+      --gradient-angle: 360deg;
+    }
+  }
+
+  /* CSS 变量动画支持 */
+  @property --gradient-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+  }
+
+  /* 悬停效果 */
+  .post-card-wrapper:hover::before {
+    opacity: 0.8;
+  }
+
+  /* 发光效果 */
+  .post-card-wrapper:hover::before {
+    filter: blur(8px);
+  }
+
+  /* 为了更好的视觉效果，添加第二层边框 */
+  .post-card-wrapper::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 0.75rem;
+    padding: 2px;
+    background: conic-gradient(
+      from var(--gradient-angle, 0deg),
+      var(--primaryColor),
+      var(--highlightColor),
+      var(--secondaryColor),
+      var(--highlightColor),
+      var(--primaryColor)
+    );
+    -webkit-mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    animation: rotate-gradient 8s linear infinite reverse;
+    z-index: -2;
+  }
+
+  .post-card-wrapper:hover::after {
+    opacity: 0.4;
+    filter: blur(16px);
+  }
+
+  /* 内容区域样式 */
+  .post-card-content {
+    background: var(--background-color, oklch(22% 0.005 298));
+    border-radius: 0.5rem;
+    transition: transform 0.3s ease;
+  }
+
+  /* 悬停时轻微上浮 */
+  .post-card-wrapper:hover .post-card-content {
+    transform: translateY(-2px);
+  }
+
+  /* 置顶文章特殊效果 */
+  .post-card-wrapper:has(.pin-icon)::before,
+  .post-card-wrapper:has(.pin-icon)::after {
+    background: conic-gradient(
+      from var(--gradient-angle, 0deg),
+      oklch(0.93 0.195089 103.2532 / 0.8), /* 金色 */
+      var(--primaryColor),
+      oklch(0.93 0.195089 103.2532 / 0.8),
+      var(--secondaryColor),
+      oklch(0.93 0.195089 103.2532 / 0.8)
+    );
+  }
+
+  /* 移动端优化 */
+  @media (max-width: 768px) {
+    .post-card-wrapper::before,
+    .post-card-wrapper::after {
+      animation-duration: 12s; /* 移动端减慢动画 */
+    }
+  }
+
+  /* 减少动画模式 */
+  @media (prefers-reduced-motion: reduce) {
+    .post-card-wrapper::before,
+    .post-card-wrapper::after {
+      animation: none;
+    }
+  }
+</style>
